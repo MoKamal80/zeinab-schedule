@@ -1481,7 +1481,7 @@ const studentsCollection = db.collection('students');
   function updateNotifBtn() {
     const btn = $('notifBtn');
     if (!btn) return;
-    const granted = 'Notification' in window && Notification.permission === 'granted';
+    const granted = 'Notification' in window && Notification.permission === 'granted' && localStorage.getItem('fcmOk') === '1';
     const denied = 'Notification' in window && Notification.permission === 'denied';
     btn.classList.toggle('on', granted);
     btn.textContent = granted ? '🔔 Notifications On' : denied ? '🔕 Blocked in browser' : '🔔 Enable Notifications';
@@ -1503,11 +1503,12 @@ const studentsCollection = db.collection('students');
         token, uid: auth.currentUser ? auth.currentUser.uid : null,
         updatedAt: new Date().toISOString(), ua: navigator.userAgent.slice(0, 120)
       });
+      localStorage.setItem('fcmOk', '1');
       updateNotifBtn();
       if (!silent) alert('✅ Notifications enabled on this device.');
     } catch (e) {
       console.error('FCM setup failed:', e);
-      warn('⚠️ Could not enable notifications. Check the console for details.');
+      warn('⚠️ Could not enable notifications.\n\n' + (e.code || '') + '\n' + String(e.message || e).slice(0, 300));
     }
   }
 
