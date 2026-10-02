@@ -11,9 +11,17 @@ const pretty = t => t.replace(' ', ':00 '); // "3 PM" -> "3:00 PM"
 (async () => {
   const now = new Date();
   const hour = parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(now), 10);
-  if (hour !== 9 && !process.env.FORCE) { console.log(`Cairo hour is ${hour}, not 9 — skipping.`); return; }
+  // GitHub's scheduler can run late, so accept 9:00-11:59 Cairo time and send only once per day.
+  const todayISO = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(now); // YYYY-MM-DD
+  const sentRef = db.collection('meta').doc('lastSent');
+  if (!process.env.FORCE) {
+    if (hour < 9 || hour > 11) { console.log(`Cairo hour is ${hour}, outside 9-11 — skipping.`); return; }
+    const prev = await sentRef.get();
+    if (prev.exists && prev.data().date === todayISO) { console.log('Already sent today — skipping.'); return; }
+  }
 
-  const today = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'long' }).format(now);
+  const real = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'long' }).format(now);
+  const today = (process.env.TEST_DAY || '').trim() || real; // manual test: type e.g. Saturday
   const items = [];
   (await db.collection('students').get()).forEach(doc => {
     const s = doc.data();
@@ -41,5 +49,6 @@ const pretty = t => t.replace(' ', ':00 '); // "3 PM" -> "3:00 PM"
   await Promise.all(res.responses.map((r, i) =>
     !r.success && /registration-token-not-registered|invalid-argument/.test(r.error?.code || '')
       ? tokenDocs[i].ref.delete() : null));
+  if (res.successCount > 0 && !process.env.FORCE) await sentRef.set({ date: todayISO, at: new Date().toISOString() });
   console.log(`Sent: ${res.successCount} ok, ${res.failureCount} failed.`);
 })().catch(e => { console.error(e); process.exit(1); });
