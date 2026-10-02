@@ -1,8 +1,12 @@
 name: Morning schedule notification
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '5,35 6-8 * * *'
   workflow_dispatch:
+    inputs:
+      daily:
+        description: 'true = behave exactly like the scheduled morning run'
+        default: 'false'
 jobs:
   send:
     runs-on: ubuntu-latest
@@ -14,4 +18,4 @@ jobs:
       - run: node send-morning-notification.js
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          FORCE: '1'
+          FORCE: ${{ (github.event_name == 'workflow_dispatch' && inputs.daily != 'true') && '1' || '' }}
